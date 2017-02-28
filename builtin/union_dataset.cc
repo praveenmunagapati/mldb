@@ -1,7 +1,7 @@
 /**                                                                 -*- C++ -*-
  * union_dataset.cc
  * Mich, 2016-09-14
- * This file is part of MLDB. Copyright 2016 Datacratic. All rights reserved.
+ * This file is part of MLDB. Copyright 2016 mldb.ai inc. All rights reserved.
  **/
 #include "union_dataset.h"
 
@@ -236,7 +236,12 @@ struct UnionDataset::Itl
     // DEPRECATED
     virtual MatrixNamedRow getRow(const RowPath & rowPath) const
     {
-        throw MLDB::Exception("Unimplemented %s : %d", __FILE__, __LINE__);
+        int idx = getIdxFromRowPath(rowPath);
+        if (idx == -1) {
+            return MatrixNamedRow();
+        }
+        return datasets[idx]->getMatrixView()->getRow(
+            Path(rowPath.begin() + 1, rowPath.end()));
     }
 
     virtual bool knownColumn(const Path & column) const
@@ -356,7 +361,7 @@ struct UnionDataset::Itl
 UnionDataset::
 UnionDataset(MldbServer * owner,
              PolyConfig config,
-             const std::function<bool (const Json::Value &)> & onProgress)
+             const ProgressFunc & onProgress)
     : Dataset(owner)
 {
     auto unionConfig = config.params.convert<UnionDatasetConfig>();
@@ -364,7 +369,7 @@ UnionDataset(MldbServer * owner,
     vector<std::shared_ptr<Dataset> > datasets;
 
     for (auto & d: unionConfig.datasets) {
-        datasets.emplace_back(obtainDataset(owner, d, onProgress));
+        datasets.emplace_back(obtainDataset(owner, d, nullptr /*onProgress*/));
     }
 
     itl.reset(new Itl(server, datasets));

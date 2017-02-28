@@ -70,3 +70,12 @@
 [submodule "ext/easyexif"]
 	path = ext/easyexif
 	url = https://github.com/mldbai/easyexif.git
+[submodule "ext/libgit2"]
+	path = ext/libgit2
+	url = https://github.com/mldbai/libgit2.git
+[submodule "ext/casablanca"]
+	path = ext/casablanca
+	url = git@github.com:Microsoft/cpprestsdk.git
+[submodule "ext/azure-storage-cpp"]
+	path = ext/azure-storage-cpp
+	url = git@github.com:mldbai/azure-storage-cpp.git

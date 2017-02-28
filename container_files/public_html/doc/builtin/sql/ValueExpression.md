@@ -471,6 +471,8 @@ The following functions return numerical constants:
 - `upper(string)` returns the uppercase version of the string, according to the
   system locale.
 - `length(string)` returns the length of the string.
+- `remove_prefix(string, prefix)` returns the string with the specified prefix removed if present.
+- `remove_suffix(string, suffix)` returns the string with the specified suffix removed if present.
 - `regex_replace(string, regex, replacement)` will return the given string with
   matches of the `regex` replaced by the `replacement`.  Perl-style regular
   expressions are supported.  It is normally preferable that the `regex` be a
@@ -682,6 +684,7 @@ can be used to create bag-of-tokens representations of strings, by returning a r
 columns are formed by tokenizing `str` by splitting along `splitChars` and whose values by default are the
 number of occurrences of those tokens within `str`. For example `tokenize('a b b c c c', {splitChars:' '})` will return the row `{'a': 1, 'b': 2, 'c': 3}`.
 - `token_extract(str, n, {splitChars: ',', quoteChar: '', offset: 0, limit: null, minTokenLength: 1})` will return the `n`th token from `str` using the same tokenizing rules as `tokenize()` above. Only the tokens respecting the `minTokenLength` will be considered, and ngram options are ignored.
+- `split_part(str, splitChars)` will return an embedding of all tokens as separated by the provided `splitChars`.
 
 Parameters to `tokenize` and `token_extract` are as follows:
 

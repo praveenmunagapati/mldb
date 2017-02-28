@@ -1,7 +1,7 @@
 /** expression_value.h                                             -*- C++ -*-
     Jeremy Barnes, 14 February 2015
 
-    This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+    This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 
     Code for the type that holds the value of an expression.
 */
@@ -333,6 +333,8 @@ struct ExpressionValueInfo {
 
     /// Return a list of all known column names
     virtual std::vector<ColumnPath> allColumnNames() const;
+
+    virtual std::vector<ColumnPath> allAtomNames() const;
     
     /// Is the other value compatible with this info?
     virtual bool isCompatible(const ExpressionValue & value) const = 0;
@@ -1220,6 +1222,8 @@ struct ExpressionValue {
     */
     size_t hash() const;
 
+    void DebugPrint();
+
 private:
     void extractImpl(void * obj, const ValueDescription & desc) const;
 
@@ -1630,7 +1634,7 @@ struct AnyValueInfo: public ExpressionValueInfoT<ExpressionValue> {
         return true; 
     }
 
-    virtual std::shared_ptr<ExpressionValueInfo> getConst(bool constant) const
+    virtual std::shared_ptr<ExpressionValueInfo> getConst(bool constant) const override
     {
         return std::make_shared<AnyValueInfo>(constant);
     }
@@ -1672,6 +1676,11 @@ struct RowValueInfo: public ExpressionValueInfoT<RowValue> {
         return true;
     }
 
+    virtual bool couldBeEmbedding() const override 
+    { 
+        return true; 
+    }
+
     virtual bool couldBeRow() const override
     {
         return true;
@@ -1682,7 +1691,8 @@ struct RowValueInfo: public ExpressionValueInfoT<RowValue> {
         return false;
     }
 
-    virtual std::shared_ptr<ExpressionValueInfo> getConst(bool constant) const
+    virtual std::shared_ptr<ExpressionValueInfo>
+    getConst(bool constant) const override
     {
         auto clone = std::make_shared<RowValueInfo>(*this);
         clone->isConstant = constant;
@@ -1788,7 +1798,9 @@ struct EmbeddingValueInfo: public RowValueInfo {
         return value.isArray();
     }
 
-   virtual std::shared_ptr<ExpressionValueInfo> getConst(bool constant) const {
+    virtual std::shared_ptr<ExpressionValueInfo>
+    getConst(bool constant) const override
+    {
         auto clone = std::make_shared<EmbeddingValueInfo>(*this);
         clone->isConstant = constant;
         return clone;
@@ -1834,7 +1846,8 @@ struct VariantExpressionValueInfo: public ExpressionValueInfoT<ExpressionValue> 
 
     virtual std::string getScalarDescription() const override;
 
-    virtual std::shared_ptr<ExpressionValueInfo> getConst(bool constant) const
+    virtual std::shared_ptr<ExpressionValueInfo>
+    getConst(bool constant) const override
     {
         return std::make_shared<VariantExpressionValueInfo>(left_, right_, constant);
     }

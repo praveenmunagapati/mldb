@@ -1,8 +1,8 @@
-// This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+// This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 
 /** poly_collection.cc                                             -*- C++ -*-
     Jeremy Barnes, 22 December 2014
-    Copyright (c) 2014 Datacratic Inc.  All rights reserved.
+    Copyright (c) 2014 mldb.ai inc.  All rights reserved.
 
     Implementation of a polymorphic collection.
 */
@@ -141,7 +141,7 @@ getKey(PolyConfig & config)
         + std::to_string(std::hash<std::thread::id>()(std::this_thread::get_id()));
     
     // Create an auto hash that is cleary identified as one
-    return config.id = MLDB::format("auto-%016llx-%016llx",
+    return config.id = MLDB::format("auto_%016llx_%016llx",
                                   (unsigned long long)jsonHash(jsonEncode(config)),
                                   (unsigned long long)jsonHash(disambig));
 }

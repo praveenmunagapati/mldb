@@ -1,6 +1,6 @@
 /** dataset_context.cc
     Jeremy Barnes, 24 February 2015
-    Copyright (c) 2015 Datacratic Inc.  All rights reserved.
+    Copyright (c) 2015 mldb.ai inc.  All rights reserved.
 
     Context to bind a row expression to a dataset.
 */
@@ -313,6 +313,27 @@ doGetColumn(const Utf8String & tableName,
     //    cerr << "  child " << c << endl;
     //cerr << "simplified = " << simplified << endl;
 
+    //"Select x" select a single column but x might be structured
+    //And so we use doGetAllColumnsInternal to build the complete ExpressionValueInfo
+    auto filter = ColumnFilter([=] (const ColumnPath & inputColumnName) -> ColumnPath
+            {
+                if (inputColumnName.matchWildcard(simplified)) {
+                    return inputColumnName.removePrefix(simplified);
+                }
+                else {
+                    return ColumnPath();
+                }
+            });
+
+    auto columns = doGetAllColumnsInternal(tableName, filter, false);
+
+    std::shared_ptr<ExpressionValueInfo> info = columns.info;
+    auto knownColumns = columns.info->getKnownColumns();
+    if (knownColumns.size() == 1)
+        info = knownColumns[0].valueInfo;
+    else if (knownColumns.size() == 0)
+        info = std::make_shared<AtomValueInfo>();
+
     return {[=] (const SqlRowScope & context,
                  ExpressionValue & storage,
                  const VariableFilter & filter) -> const ExpressionValue &
@@ -320,7 +341,7 @@ doGetColumn(const Utf8String & tableName,
                 auto & row = context.as<RowScope>();
                 return row.getColumn(simplified, filter, storage);
             },
-            std::make_shared<AtomValueInfo>()};
+            info};
 }
 
 

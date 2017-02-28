@@ -1,6 +1,6 @@
 # MLDB-1935-const-optim.py
 # Mathieu Marquis Bolduc, 2016-12-15
-# This file is part of MLDB. Copyright 2016 Datacratic. All rights reserved.
+# This file is part of MLDB. Copyright 2016 mldb.ai inc. All rights reserved.
 #
 
 import unittest
@@ -20,7 +20,6 @@ class ConstOptimTest(MldbUnitTest):
         ds.commit()
 
     def test_fetcher_call(self):
-        inceptionUrl = 'file://test.jpb'
 
         mldb.put('/v1/functions/fetch', {
             "type": 'fetcher',
@@ -28,12 +27,12 @@ class ConstOptimTest(MldbUnitTest):
         })
 
         startTime = time.clock()
-        mldb.query('SELECT blob_length(fetch({\'file://testing/logo-new.jpg\' as url})[content]) as x')
+        mldb.query('SELECT blob_length(fetch({\'file://mldb/testing/logo-new.jpg\' as url})[content]) as x')
         deltaT = time.clock() - startTime
         mldb.log(deltaT)
 
         startTime = time.clock()
-        mldb.query('SELECT x, blob_length(fetch({\'file://testing/logo-new.jpg\' as url})[content]) as y FROM sample')
+        mldb.query('SELECT x, blob_length(fetch({\'file://mldb/testing/logo-new.jpg\' as url})[content]) as y FROM sample')
         optimizedDeltaT = time.clock() - startTime
         mldb.log(optimizedDeltaT)
 
@@ -44,7 +43,7 @@ class ConstOptimTest(MldbUnitTest):
         })
 
         startTime = time.clock()
-        mldb.query('SELECT x, blob_length(fetch2({\'file://testing/logo-new.jpg\' as url})[content]) as y FROM sample')
+        mldb.query('SELECT x, blob_length(fetch2({\'file://mldb/testing/logo-new.jpg\' as url})[content]) as y FROM sample')
         nonOptimizedDeltaT = time.clock() - startTime
         mldb.log(deltaT)
 

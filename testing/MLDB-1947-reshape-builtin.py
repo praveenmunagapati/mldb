@@ -1,7 +1,7 @@
 #
 # MLDB-1947-reshape-builtin.py
 # Mathieu Marquis Bolduc, 2016-09-15
-# This file is part of MLDB. Copyright 2016 Datacratic. All rights reserved.
+# This file is part of MLDB. Copyright 2016 mldb.ai inc. All rights reserved.
 #
 
 mldb = mldb_wrapper.wrap(mldb)  # noqa
@@ -53,6 +53,36 @@ class MLDB1947reshapebuiltin(MldbUnitTest):  # noqa
         with self.assertRaisesRegexp(mldb_wrapper.ResponseException,
                                      'requires an embedding'):
             mldb.query("SELECT shape(reshape([1], 'not an embedding')) as dim")
+
+    def test_reshape_row(self):
+        res = mldb.query('SELECT reshape({"0": 1, "1": 2, "2": 3, "3": 4}, [2, 2]) as *')
+
+        expected = [["_rowName", "0.0", "0.1", "1.0", "1.1"],
+                    ["result", 1, 2, 3, 4]]
+
+        self.assertTableResultEquals(res, expected)
+
+        res = mldb.query('SELECT reshape({"0": 1, "1": 2, "2": 3, "3": 4}, [1, 4]) as *')
+
+        expected = [["_rowName", "0.0", "0.1", "0.2", "0.3"],
+                    ["result", 1, 2, 3, 4]]
+
+        self.assertTableResultEquals(res, expected)
+
+
+        res = mldb.query('SELECT reshape({"0": {"0": 1, "1": 2}, "1": {"0": 3, "1": 4}}, [4]) as *')
+        
+        expected = [["_rowName", "0", "1", "2", "3"],
+                    ["result", 1, 2, 3, 4]]
+
+        self.assertTableResultEquals(res, expected)
+
+        res = mldb.query('SELECT reshape({"0": {"0": 1, "1": 2}, "1": {"0": 3, "1": 4}}, [1, 4]) as *')
+        
+        expected = [["_rowName", "0.0", "0.1", "0.2", "0.3"],
+                    ["result", 1, 2, 3, 4]]
+
+        self.assertTableResultEquals(res, expected)
 
 if __name__ == '__main__':
     mldb.run_tests()

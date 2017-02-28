@@ -1,6 +1,6 @@
 /** builtin_functions.cc
     Jeremy Barnes, 14 June 2015
-    This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+    This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 
     Builtin functions for SQL.
 */
@@ -969,6 +969,52 @@ BoundFunction implicit_cast(const std::vector<BoundSqlExpression> & args)
 
 static RegisterBuiltin registerImplicitCast(implicit_cast, "implicit_cast");
 
+BoundFunction remove_prefix(const std::vector<BoundSqlExpression> & args)
+{
+    checkArgsSize(args.size(), 2);
+
+    return {[] (const std::vector<ExpressionValue> & args,
+                const SqlRowScope & scope) -> ExpressionValue
+            {
+                checkArgsSize(args.size(), 2);
+                if (!args[0].isString() || !args[1].isString()) {
+                     throw MLDB::Exception("The arguments passed to remove_prefix must be two strings");
+                }
+                else {
+                    Utf8String text = args[0].toUtf8String();
+                    text.removePrefix(args[1].toUtf8String());
+                    return ExpressionValue(std::move(text),
+                                           args[0].getEffectiveTimestamp());
+                }
+            },
+            std::make_shared<Utf8StringValueInfo>()};
+}
+
+static RegisterBuiltin registerRemovePrefix(remove_prefix, "remove_prefix");
+
+BoundFunction remove_suffix(const std::vector<BoundSqlExpression> & args)
+{
+    checkArgsSize(args.size(), 2);
+
+    return {[] (const std::vector<ExpressionValue> & args,
+                const SqlRowScope & scope) -> ExpressionValue
+            {
+                checkArgsSize(args.size(), 2);
+                if (!args[0].isString() || !args[1].isString()) {
+                     throw MLDB::Exception("The arguments passed to remove_suffix must be two strings");
+                }
+                else {
+                    Utf8String text = args[0].toUtf8String();
+                    text.removeSuffix(args[1].toUtf8String());
+                    return ExpressionValue(std::move(text),
+                                           args[0].getEffectiveTimestamp());
+                }
+            },
+            std::make_shared<Utf8StringValueInfo>()};
+}
+
+static RegisterBuiltin registerRemoveSuffix(remove_suffix, "remove_suffix");
+
 BoundFunction regex_replace(const std::vector<BoundSqlExpression> & args)
 {
     // regex_replace(string, regex, replacement)
@@ -1905,6 +1951,41 @@ BoundFunction token_extract(const std::vector<BoundSqlExpression> & args)
 
 static RegisterBuiltin registerToken_extract(token_extract, "token_extract");
 
+BoundFunction token_split(const std::vector<BoundSqlExpression> & args)
+{
+    if (args.size() != 2)
+        throw HttpReturnException(400, "requires two arguments");
+
+    return {[=] (const std::vector<ExpressionValue> & args,
+                 const SqlRowScope & scope) -> ExpressionValue
+            {
+                Date ts = args[0].getEffectiveTimestamp();
+
+                Utf8String text = args[0].toUtf8String();
+
+                Utf8String separator = args[1].toUtf8String();
+
+                TokenizeOptions options;
+
+                ParseContext pcontext(text.rawData(), text.rawData(), text.rawLength());
+
+                auto tokens = token_split(pcontext, separator);
+
+                std::vector<CellValue> values;
+
+                for (auto& token : tokens) {
+                    values.push_back(token);
+                }
+
+                ExpressionValue result(values, ts);
+
+                return result;
+            },
+            std::make_shared<UnknownRowValueInfo>()};
+}
+
+static RegisterBuiltin registerToken_split(token_split, "split_part");
+
 BoundFunction horizontal_count(const std::vector<BoundSqlExpression> & args)
 {
     checkArgsSize(args.size(), 1);
@@ -2492,7 +2573,7 @@ BoundFunction flatten(const std::vector<BoundSqlExpression> & args)
                     // If this is an embedding (but couldn't be proved statically),
                     // then do it the simple and efficient way
                     if (args[0].isEmbedding()) {
-                        size_t len = args[0].rowLength();
+                        size_t len = args[0].getAtomCount();
                         return args[0].reshape({len});
                     }
 
@@ -2580,7 +2661,7 @@ BoundFunction reshape(const std::vector<BoundSqlExpression> & args)
         throw HttpReturnException(400, "requires an embedding as first argument, got " + jsonEncodeStr(args[0].info));
     }
 
-    if (!args[1].info->isEmbedding())
+    if (!args[1].info->couldBeEmbedding())
         throw HttpReturnException(400, "requires an embedding as second argument");
 
     if (args[1].info->isConst()) {
@@ -2734,7 +2815,7 @@ BoundFunction concat(const std::vector<BoundSqlExpression> & args)
             // Go argument by argument, copying elements in
             char * data = (char *)outBuffer.get();
             for (auto & a: args) {
-                size_t n = a.rowLength();
+                size_t n = a.getAtomCount();
                 a.convertEmbedding(data, n, st);
                 size_t bytes = storageBufferBytes(n, st);
                 data += bytes;
@@ -3250,7 +3331,6 @@ BoundFunction tryFct(const std::vector<BoundSqlExpression> & args)
 }
 
 static RegisterBuiltin registerTryFunction(tryFct, "try");
-
 
 /*****************************************************************************/
 /* BUILTIN CONSTANTS                                                         */

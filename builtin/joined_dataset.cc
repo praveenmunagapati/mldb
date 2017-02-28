@@ -1,8 +1,8 @@
-// This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+// This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 
 /** joined_dataset.cc                                              -*- C++ -*-
     Jeremy Barnes, 28 February 2015
-    Copyright (c) 2015 Datacratic Inc.  All rights reserved.
+    Copyright (c) 2015 mldb.ai inc.  All rights reserved.
 
 */
 
@@ -21,9 +21,10 @@
 #include "mldb/http/http_exception.h"
 #include "mldb/types/hash_wrapper_description.h"
 #include "mldb/utils/compact_vector.h"
+#include <functional>
 
 using namespace std;
-
+using namespace std::placeholders;
 
 
 namespace MLDB {
@@ -121,6 +122,9 @@ struct JoinedDataset::Itl
 
     /// Mapping from the table column hash to output column name
     std::unordered_map<ColumnHash, ColumnPath> leftColumns, rightColumns;
+
+    /// Mapping from the table column hash to output column name for structured methods
+    std::unordered_map<uint64_t, PathElement> leftColumnsExpr, rightColumnsExpr;
 
     /// Structure used to implement operations from each table
     TableOperations leftOps, rightOps;
@@ -302,6 +306,14 @@ struct JoinedDataset::Itl
 
             columnIndex[newColumnHash] = std::move(entry);
             rightColumns[c] = newColumnName;
+        }
+
+        for (auto & c: leftDataset->getColumnPaths()) {
+            leftColumnsExpr[c[0].hash()] = c[0];
+        }
+
+        for (auto & c: rightDataset->getColumnPaths()) {
+            rightColumnsExpr[c[0].hash()] = c[0];
         }
 
         if (debug) {
@@ -701,6 +713,62 @@ struct JoinedDataset::Itl
 
     }
 
+    ExpressionValue
+    getRowExpr(const RowPath & rowName) const
+    {
+        StructValue result;
+
+        auto it = rowIndex.find(rowName);
+        if (it == rowIndex.end())
+            return result;
+
+        const RowEntry & row = rows.at(it->second);
+        if (rowName != row.rowName)
+            return result;
+
+        auto doRow = [&] (const Dataset & dataset,
+                      const RowPath & rowName,
+                      const std::unordered_map<uint64_t, PathElement> & mapping,
+                      const Utf8String& childName)
+        {
+            StructValue childresult;
+            ExpressionValue rowValue;
+            if (!rowName.empty())
+                rowValue = dataset.getRowExpr(rowName);
+
+            if (rowValue.empty())
+                return;
+
+
+            auto onColumn = [&] (const PathElement & columnName,
+                                 const ExpressionValue & val)
+            {
+                uint64_t colHash = columnName.hash();
+                auto it = mapping.find(colHash);
+
+                if (it != mapping.end()) {
+
+                    if (childName.empty())
+                        result.emplace_back(columnName, val);
+                    else
+                        childresult.emplace_back(columnName, val);
+                }
+                return true;
+            };
+
+            rowValue.forEachColumn(onColumn);
+
+            if (!childName.empty())
+                result.emplace_back(PathElement(childName), ExpressionValue(childresult));
+        };
+
+        doRow(*leftDataset, row.leftName, leftColumnsExpr, childAliases[JOIN_SIDE_LEFT]);
+        doRow(*rightDataset, row.rightName, rightColumnsExpr, childAliases[JOIN_SIDE_RIGHT]);
+
+        return result;
+
+    }
+
     virtual RowPath getRowPath(const RowHash & rowHash) const
     {
         auto it = rowIndex.find(rowHash);
@@ -919,7 +987,7 @@ struct JoinedDataset::Itl
 JoinedDataset::
 JoinedDataset(MldbServer * owner,
               PolyConfig config,
-              const std::function<bool (const Json::Value &)> & onProgress)
+              const ProgressFunc & onProgress)
     : Dataset(owner)
 {
     auto joinConfig = config.params.convert<JoinedDatasetConfig>();
@@ -929,12 +997,23 @@ JoinedDataset(MldbServer * owner,
 
     SqlExpressionMldbScope scope(owner);
 
+    /* The assumption is that both sides have the same number
+       of items to process.  This is obviously not always the case
+       so the progress may differ in speed when switching from the 
+       left dataset to right dataset.
+    */ 
+    ProgressState joinState(100);
+    auto joinedProgress = [&](uint side, const ProgressState & state) {
+        joinState = state.count / *state.total * 100 + 50 * side;
+        return onProgress(joinState);
+    };
+
     // Create a scope to get our datasets from
     SqlExpressionMldbScope mldbScope(server);
 
     // Obtain our datasets
-    BoundTableExpression left = joinConfig.left->bind(mldbScope);
-    BoundTableExpression right = joinConfig.right->bind(mldbScope);
+    BoundTableExpression left = joinConfig.left->bind(mldbScope, bind(joinedProgress, 0, _1));
+    BoundTableExpression right = joinConfig.right->bind(mldbScope, bind(joinedProgress, 1, _1));
     
     
     itl.reset(new Itl(scope,
@@ -1177,6 +1256,13 @@ JoinedDataset::
 getChainedJoinDepth() const
 {
     return itl->chainedJoinDepth;
+}
+
+ExpressionValue
+JoinedDataset::
+getRowExpr(const RowPath & row) const
+{
+    return itl->getRowExpr(row);
 }
 
 

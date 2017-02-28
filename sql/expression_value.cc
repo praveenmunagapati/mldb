@@ -1,8 +1,8 @@
 /** expression_value.h                                             -*- C++ -*-
     Jeremy Barnes, 14 February 2015
-    Copyright (c) 2015 Datacratic Inc.  All rights reserved.
+    Copyright (c) 2015 mldb.ai inc.  All rights reserved.
 
-    This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+    This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 
     Code for the type that holds the value of an expression.
 */
@@ -241,6 +241,14 @@ getKnownAtoms(const ColumnPath prefix) const
                                 atom.sparsity == c.sparsity ? atom.sparsity : COLUMN_IS_SPARSE,
                                 -1);
             }
+
+            //if it has no child and could be scalar, return as an atom
+            if (subResult.empty() && c.valueInfo->couldBeScalar() ){
+                result.emplace_back(prefix + c.columnName, 
+                                c.valueInfo,
+                                c.sparsity,
+                                -1);
+            }
         }
         else {
             result.emplace_back(prefix + c.columnName, 
@@ -259,6 +267,16 @@ allColumnNames() const
 {
     std::vector<ColumnPath> result;
     for (auto & val: getKnownColumns())
+        result.emplace_back(std::move(val.columnName));
+    return result;
+}
+
+std::vector<ColumnPath>
+ExpressionValueInfo::
+allAtomNames() const
+{
+    std::vector<ColumnPath> result;
+    for (auto & val: getKnownAtoms())
         result.emplace_back(std::move(val.columnName));
     return result;
 }
@@ -1169,12 +1187,22 @@ struct ExpressionValue::Embedding {
     DimsVector dims_;
     std::shared_ptr<const EmbeddingMetadata> metadata_;
 
+    /* Total flattened length */
     size_t length() const
     {
         size_t result = 1;
         for (auto & d: dims_)
             result *= d;
         return result;
+    }
+
+    /* Non-Flattened length */
+    size_t rowLength() const
+    {
+        if (!dims_.empty())
+            return dims_[0];
+        else 
+            return 0;
     }
 
     CellValue getValue(size_t n) const
@@ -1386,7 +1414,9 @@ struct ExpressionValue::Embedding {
 
         if (totalLength != length()) {
             throw HttpReturnException
-                (400, "Attempt to change embedding size by reshaping");
+                (400, "Attempt to change embedding size by reshaping.  Original size "
+                 "is [" + to_string(length()) + 
+                 "] target size is [" + to_string(totalLength) + "]");
         }
         return ExpressionValue::embedding(ts, data_,
                                           storageType_,
@@ -2686,6 +2716,7 @@ coerceToEmbedding() const
                             shape.resize(fullColumnName.size());
 
                         for (size_t i = 0; i < fullColumnName.size(); ++i) {
+                            // indexing starts at 0 therefore the +1
                             shape[i] = std::max(shape[i], (size_t)(fullColumnName[i].toIndex()+1));
                         }
 
@@ -3226,13 +3257,35 @@ rowLength() const
         return structured_->size();
     }
     else if (type_ == Type::EMBEDDING) {
+        return embedding_->rowLength();
+    }
+    else if (type_ == Type::SUPERPOSITION) {
+        return superposition_->values.size();
+    }
+    else throw HttpReturnException(500, "Attempt to access non-row as row",
+                                   "value", *this);
+}
+
+size_t 
+ExpressionValue::
+getAtomCount() const
+{
+    if (type_ == Type::STRUCTURED) {
+        size_t count = 0;
+        for (const auto& v : *structured_)
+            count += std::get<1>(v).getAtomCount();
+
+        return count;
+    }
+    else if (type_ == Type::EMBEDDING) {
         return embedding_->length();
     }
     else if (type_ == Type::SUPERPOSITION) {
         return superposition_->length();
     }
-    else throw HttpReturnException(500, "Attempt to access non-row as row",
-                                   "value", *this);
+    else {
+        return 1;
+    }
 }
 
 void
@@ -3622,7 +3675,10 @@ getFiltered(const VariableFilter & filter,
             accum(val);
             ExpressionValue storage;
             const ExpressionValue * output = accum.extract(storage);
-            ExcAssert(output);
+
+            if (!output)
+                return true;
+
             if (output != &storage)
                 rows.emplace_back(std::move(col), *output);
             else rows.emplace_back(std::move(col), std::move(storage));
@@ -4773,6 +4829,20 @@ assertType(Type requested, const std::string & details) const
         }
 
         throw HttpReturnException(400, msg);
+    }
+}
+
+void
+ExpressionValue::
+DebugPrint()
+{
+    string str = jsonEncodeStr(*this);
+    if (str.length() > 1000) {
+        cerr << str.substr(1000) << "...<truncated "
+             << str.length() - 1000 << "chars" << endl;
+    }
+    else {
+        cerr << str << endl;
     }
 }
 

@@ -1,8 +1,8 @@
 /** accuracy.cc
     Jeremy Barnes, 16 December 2014
-    Copyright (c) 2014 Datacratic Inc.  All rights reserved.
+    Copyright (c) 2014 mldb.ai inc.  All rights reserved.
 
-    This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+    This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 
     Implementation of an ACCURACY algorithm for embedding of a dataset.
 */
@@ -395,7 +395,7 @@ runCategorical(AccuracyConfig & runAccuracyConf,
         class_stats["f1Score"] = 2 * ML::xdiv(precision * recall,
                                         precision + recall);
         class_stats["support"] = support;
-        results["labelStatistics"][actual_it.first.toString()] = class_stats;
+        results["labelStatistics"][actual_it.first.toUtf8String()] = class_stats;
 
         total_accuracy += accuracy * support;
         total_precision += precision * support;
@@ -621,7 +621,8 @@ run(const ProcedureRunConfig & run,
     // 1.  Get the input dataset
     SqlExpressionMldbScope context(server);
 
-    auto dataset = runAccuracyConf.testingData.stm->from->bind(context).dataset;
+    ConvertProgressToJson convertProgressToJson(onProgress);
+    auto dataset = runAccuracyConf.testingData.stm->from->bind(context, convertProgressToJson).dataset;
 
     // prepare output dataset
     std::shared_ptr<Dataset> output;

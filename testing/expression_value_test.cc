@@ -1,6 +1,6 @@
 /** expression_value_test.cc
     Jeremy Barnes, 1 April 2016
-    Copyright (c) 2016 Datacratic Inc.  All rights reserved.
+    Copyright (c) 2016 mldb.ai inc.  All rights reserved.
 
     Tests for the ExpressionValue class.
 */
@@ -535,3 +535,16 @@ BOOST_AUTO_TEST_CASE( test_superposition_with_search_row )
     BOOST_CHECK_EQUAL(jsonEncode(found), Json::parse(expected));
 }
 
+BOOST_AUTO_TEST_CASE( test_embedding_length )
+{
+    std::vector<float> values = {1,2,3,4};
+    Date ts;
+    DimsVector shape = {2,2};
+
+    ExpressionValue myValue(values,
+                            ts,
+                            shape);
+
+    BOOST_CHECK_EQUAL(myValue.rowLength(), 2);
+    BOOST_CHECK_EQUAL(myValue.getAtomCount(), 4);
+}

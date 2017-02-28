@@ -1,8 +1,8 @@
 /** sql_expression_operations.cc
     Jeremy Barnes, 24 February 2015
-    Copyright (c) 2015 Datacratic Inc.  All rights reserved.
+    Copyright (c) 2015 mldb.ai inc.  All rights reserved.
 
-    This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+    This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 */
 
 #include "sql_expression_operations.h"
@@ -1827,9 +1827,9 @@ bind(SqlBindingScope & scope) const
                     ts.setMin(v.getEffectiveTimestamp());
 
                     std::vector<CellValue> valueCells
-                        = v.getEmbeddingCell(v.rowLength());
+                        = v.getEmbeddingCell(v.getAtomCount());
 
-                    if (valueCells.size() != v.rowLength())
+                    if (valueCells.size() != v.getAtomCount())
                         throw HttpReturnException(400, "Embeddings don't contain the same number of elements");
 
                     cells.insert(cells.end(),
@@ -2914,7 +2914,7 @@ bind(SqlBindingScope & scope) const
 
     switch (kind) {
     case SUBTABLE: {
-        BoundTableExpression boundTable = subtable->bind(scope);
+        BoundTableExpression boundTable = subtable->bind(scope, nullptr /*onProgress*/);
 
         isConstant = false; //TODO
 
@@ -2949,7 +2949,8 @@ bind(SqlBindingScope & scope) const
                                             WhenExpression::TRUE,
                                             *SqlExpression::TRUE,
                                             orderBy,
-                                            offset, limit);
+                                            offset, limit,
+                                            nullptr /*onProgress*/);
             
             // This is a set of all values we can search for in our expression
             auto valsPtr = std::make_shared<std::unordered_set<ExpressionValue> >();
@@ -4195,6 +4196,54 @@ wildcards() const
     return result;
 }
 
+
+  
+BoundSqlExpression
+GroupByKeyExpression::
+bind(SqlBindingScope & scope) const
+{
+    auto getGroupbyKey = scope.doGetGroupByKey(index);
+
+    if (!getGroupbyKey.info) {
+        throw HttpReturnException(400, "scope " + MLDB::type_name(scope)
+                            + " doGetGroupByKey '"
+                            + "' didn't return info");
+    }
+
+    //GroupByKeyExpression are never constant because we need the group by row
+    //to evaluate them.
+    auto outputInfo = getGroupbyKey.info->getConst(false);
+
+    return {[=] (const SqlRowScope & row,
+                 ExpressionValue & storage,
+                 const VariableFilter & filter) -> const ExpressionValue &
+            {
+                return getGroupbyKey(row, storage, filter);
+            },
+            this,
+            outputInfo};
+}
+
+Utf8String
+GroupByKeyExpression::
+print() const
+{
+    return "GroupBy Key [" + to_string(index) + "]";
+}
+
+std::shared_ptr<SqlExpression>
+GroupByKeyExpression::
+transform(const TransformArgs & transformArgs) const
+{
+    return make_shared<GroupByKeyExpression>(index);
+}
+
+std::vector<std::shared_ptr<SqlExpression> >
+GroupByKeyExpression::
+getChildren() const
+{
+    return {};
+}
 
 } // namespace MLDB
 

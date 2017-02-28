@@ -1,4 +1,4 @@
-// This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+// This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 
 #define BOOST_TEST_MAIN
 #define BOOST_TEST_DYN_LINK
@@ -104,4 +104,48 @@ BOOST_AUTO_TEST_CASE( test_string_trim )
         string result = ML::trim(original);
         BOOST_CHECK_EQUAL(result, expected);
     }
+}
+
+BOOST_AUTO_TEST_CASE( test_string_split )
+{
+    vector<string> res;
+    res = ML::split("", '-');
+    BOOST_REQUIRE_EQUAL(res.size(), 1);
+    BOOST_REQUIRE_EQUAL(res[0], "");
+
+    res = ML::split("a-b-c", '-');
+    BOOST_REQUIRE_EQUAL(res.size(), 3);
+    BOOST_REQUIRE_EQUAL(res[0], "a");
+    BOOST_REQUIRE_EQUAL(res[1], "b");
+    BOOST_REQUIRE_EQUAL(res[2], "c");
+
+    res = ML::split("a-b-c", '-', -1);
+    BOOST_REQUIRE_EQUAL(res.size(), 3);
+    BOOST_REQUIRE_EQUAL(res[0], "a");
+    BOOST_REQUIRE_EQUAL(res[1], "b");
+    BOOST_REQUIRE_EQUAL(res[2], "c");
+
+    BOOST_REQUIRE_THROW(ML::split("a-b-c", '-', 0), std::exception);
+    BOOST_REQUIRE_THROW(ML::split("a-b-c", '-', -2), std::exception);
+
+    res = ML::split("a-b-c", '-', 1);
+    BOOST_REQUIRE_EQUAL(res.size(), 1);
+    BOOST_REQUIRE_EQUAL(res[0], "a-b-c");
+
+    res = ML::split("a-b-c", '-', 2);
+    BOOST_REQUIRE_EQUAL(res.size(), 2);
+    BOOST_REQUIRE_EQUAL(res[0], "a");
+    BOOST_REQUIRE_EQUAL(res[1], "b-c");
+
+    res = ML::split("a-b-c", '-', 3);
+    BOOST_REQUIRE_EQUAL(res.size(), 3);
+    BOOST_REQUIRE_EQUAL(res[0], "a");
+    BOOST_REQUIRE_EQUAL(res[1], "b");
+    BOOST_REQUIRE_EQUAL(res[2], "c");
+
+    res = ML::split("a-b-c", '-', 1000);
+    BOOST_REQUIRE_EQUAL(res.size(), 3);
+    BOOST_REQUIRE_EQUAL(res[0], "a");
+    BOOST_REQUIRE_EQUAL(res[1], "b");
+    BOOST_REQUIRE_EQUAL(res[2], "c");
 }

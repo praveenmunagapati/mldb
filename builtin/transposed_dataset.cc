@@ -1,8 +1,8 @@
-// This file is part of MLDB. Copyright 2015 Datacratic. All rights reserved.
+// This file is part of MLDB. Copyright 2015 mldb.ai inc. All rights reserved.
 
 /** transposed_dataset.cc                                              -*- C++ -*-
     Jeremy Barnes, 28 February 2015
-    Copyright (c) 2015 Datacratic Inc.  All rights reserved.
+    Copyright (c) 2015 mldb.ai inc.  All rights reserved.
 
 */
 
@@ -323,13 +323,13 @@ struct TransposedDataset::Itl
 TransposedDataset::
 TransposedDataset(MldbServer * owner,
                   PolyConfig config,
-                  const std::function<bool (const Json::Value &)> & onProgress)
+                  const ProgressFunc & onProgress)
     : Dataset(owner)
 {
     auto mergeConfig = config.params.convert<TransposedDatasetConfig>();
     
     std::shared_ptr<Dataset> dataset = obtainDataset(owner, mergeConfig.dataset,
-                                                     onProgress);
+                                                     nullptr /*onProgress*/);
 
     itl.reset(new Itl(server, dataset));
 }
@@ -411,7 +411,8 @@ std::shared_ptr<Dataset> createTransposedTable(MldbServer * server, const TableO
                                    WhenExpression::TRUE,
                                    *SqlExpression::TRUE,
                                    OrderByExpression(),
-                                   0, -1);
+                                    0, -1,
+                                    nullptr /*onProgress*/);
 
     SqlRowScope fakeRowScope;
 
