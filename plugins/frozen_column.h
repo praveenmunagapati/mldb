@@ -83,6 +83,20 @@ struct FrozenColumn: public MappedObject {
     }
 
     virtual void serialize(StructuredSerializer & serializer) const = 0;
+
+protected:
+    // Helper to grab the metadata from the given structure
+    template<typename Metadata>
+    static void reconstituteMetadataT(StructuredReconstituter & reconstituter,
+                                      Metadata & md)
+    {
+        reconstituteMetadataHelper(reconstituter, &md, typeid(Metadata));
+    }
+
+    static void
+    reconstituteMetadataHelper(StructuredReconstituter & reconstituter,
+                               void * md,
+                               const std::type_info & mdType);
 };
 
 
@@ -143,6 +157,10 @@ struct FrozenColumnFormat {
            MappedSerializer & serializer,
            const ColumnFreezeParameters & params,
            std::shared_ptr<void> cachedInfo) const = 0;
+
+
+    static FrozenColumn *
+    thaw(StructuredReconstituter & reconstituter);
     
     /** Reconstitute a mapped version of the given frozen column. */
     virtual FrozenColumn *
@@ -153,6 +171,10 @@ struct FrozenColumnFormat {
     */
     static std::shared_ptr<void>
     registerFormat(std::shared_ptr<FrozenColumnFormat> format);
+
+    /** Return the format handler for the given format. */
+    static std::shared_ptr<const FrozenColumnFormat>
+    getFormat(const std::string & formatName);
 };
 
 

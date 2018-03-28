@@ -38,6 +38,8 @@ struct TabularDatasetChunk: public MappedObject {
     {
     }
 
+    TabularDatasetChunk(StructuredReconstituter & reconstituter);
+    
     TabularDatasetChunk(TabularDatasetChunk && other) noexcept
     {
         swap(other);
